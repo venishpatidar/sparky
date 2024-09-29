@@ -1,3 +1,5 @@
-*.temp
+*temp
+raw_data/
+subject.json
 .venv
 pyrightconfig.json
