@@ -3,3 +3,4 @@ raw_data/
 subject.json
 .venv
 pyrightconfig.json
+stack_and_courses/
