@@ -3,7 +3,6 @@ const fs = require("fs");
 const BASE_URL =
   "https://eadvs-cscc-catalog-api.apps.asu.edu/catalog-microservices/api/v1/search/";
 const RAW_DATA = "raw_data";
-const SUBJECT_FILE_NAME = "subject";
 const CLASS_FOLDER_NAME = "classes";
 let CLASS_FILE_COUNTER = 0;
 
@@ -96,41 +95,50 @@ async function fetchClasses(term = "2251", scrollID = "", totalClass = 0) {
   }
 }
 
-// async function fetchSubjects(term = "2251") {
-//   const response = await fetch(BASE_URL + `subjects?sl=Y&term=${term}`, {
-//     cache: "default",
-//     credentials: "include",
-//     headers: {
-//       Accept: "*/*",
-//       "Accept-Language": "en-US,en;q=0.9",
-//       Authorization: "Bearer null", //If removed gives unauthorized access
-//       "User-Agent":
-//         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
-//     },
-//     method: "GET",
-//     mode: "cors",
-//     redirect: "follow",
-//     referrer: "https://catalog.apps.asu.edu/",
-//   });
+async function fetchCourseDescr(params) {
+  const { course_id, term, subject, catalogNbr } = params;
+  const response = await fetch(
+    BASE_URL +
+      `courses?refine=Y&catalogNbr=${catalogNbr}&course_id=${course_id}&subject=${subject}&term=${term}`,
+    {
+      cache: "default",
+      credentials: "include",
+      headers: {
+        Accept: "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        Authorization: "Bearer null", //If removed gives unauthorized access
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+      },
+      method: "GET",
+      mode: "cors",
+      redirect: "follow",
+      referrer: "https://catalog.apps.asu.edu/",
+    },
+  );
 
-//   //Creating reader stream
-//   const reader = response.body.getReader();
-//   const decoder = new TextDecoder("utf-8");
-//   let allChunks = "";
-//   let { done, value } = await reader.read();
-//   while (!done) {
-//     allChunks += decoder.decode(value, { stream: true });
-//     const rs = await reader.read();
-//     done = rs.done;
-//     value = rs.value;
-//   }
-//   const JSON_OBJ = JSON.parse(allChunks);
-//   fs.writeFile(`${SUBJECT_FILE_NAME}.json`, JSON.stringify(JSON_OBJ), (err) => {
-//     if (err) throw err;
-//     console.log("File has been written!");
-//   });
-// }
+  //Creating reader stream
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let allChunks = "";
+  let { done, value } = await reader.read();
+  while (!done) {
+    allChunks += decoder.decode(value, { stream: true });
+    const rs = await reader.read();
+    done = rs.done;
+    value = rs.value;
+  }
+  const JSON_OBJ = JSON.parse(allChunks)[0];
+  if (require.main !== module) {
+    console.log(JSON_OBJ.DESCRLONG ? JSON_OBJ.DESCRLONG : "");
+  }
+  return JSON_OBJ.DESCRLONG ? JSON_OBJ.DESCRLONG : "";
+}
 
-// fetchSubjects();
-
-fetchClasses();
+if (require.main === module) {
+  // This code will be executed when the script is run directly
+  fetchClasses();
+} else {
+  // Code to be executed when the script is imported as a module
+  module.exports = { fetchCourseDescr };
+}
