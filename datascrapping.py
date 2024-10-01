@@ -4,21 +4,22 @@ from collections import defaultdict
 
 RAW_DATA_PATH = "raw_data/classes"
 OUTPUT_DIR = "courses"
+DATASET_DIR = "dataset"
 
 class Datascrapping:
     """
     maj list -> dump all courses -> ACC, ABC -> relevant details
     """
-    def __init__(self,raw_data_path:str=RAW_DATA_PATH) -> None:
-        self.major_courses_data=[]
-        self.major_course_dict=defaultdict(list)
-        
-    def get_raw_data_from_response(self)->None:
+    def __init__(self) -> None:
+        self.major_courses_data = []
+        self.major_course_dict = defaultdict(list)
+        self.dataset_parameters = []
+
+    def get_raw_data_from_response(self, folder_path=RAW_DATA_PATH)->None:
         """
-        function to pull data from response 
+        function to pull data from response
         and merging it into one list
         """
-        folder_path = RAW_DATA_PATH
         files = os.listdir(folder_path)
         for file_name in files:
             file_path = os.path.join(folder_path, file_name)
@@ -27,10 +28,10 @@ class Datascrapping:
                     content = file.readlines()
                     class_content = json.loads(content[0]) # reading the content of the file as json object
                     self.major_courses_data.extend(class_content['classes']) # pulling classes list from the object
-    
+
     def create_stack_course_dict(self)->None:
         """
-        function to create a master dict 
+        function to create a master dict
         with STACK as key and COURSES as value
         """
         for classes in self.major_courses_data:
@@ -64,6 +65,14 @@ class Datascrapping:
                 "day_list": classes['DAYLIST'] # ["T Th"]
             })
 
+            self.dataset_parameters.append({
+                "course_stack": classes['CLAS']['SUBJECT'],
+                "course_number": classes["SUBJECTNUMBER"].split(" ")[1],
+                "course_name": classes['CLAS']['COURSETITLELONG'],
+                "course_code": classes['CLAS']['CLASSNBR'],
+                "faculty_name": classes['CLAS']['INSTRUCTORSLIST']
+            })
+
 
     def export_course_list(self,output_dir:str=OUTPUT_DIR)->None:
         """
@@ -71,22 +80,35 @@ class Datascrapping:
         and store all courses offered under that STACK
         """
         folder_path = output_dir
-    
+
         # creating folder if not exist
         os.makedirs(folder_path, exist_ok=True)
-    
+
         # iterating over dict to create files as per STACK and COURSES under those STACK
         for stack, stack_courses in self.major_course_dict.items():
             file_name = f"{stack}.json"
             file_path = os.path.join(folder_path, file_name)
-    
+
             # writing dict object to a json file
             with open(file_path, "w") as json_file:
                 json.dump(stack_courses, json_file, indent=2)
         print(f"All course class exported sucessfully")
+
+    def export_dataset_parameters(self,dataset_dir:str=DATASET_DIR)->None:
+        """
+        function to pull all the combination of 5 key paramters:
+            course_stack, course_number, course_name, course_code, faculty_name
+        """
+        os.makedirs(dataset_dir, exist_ok=True)
+        file_name = "dataset_combination.json"
+        file_path = os.path.join(dataset_dir, file_name)
+        with open(file_path, "w") as json_file:
+            json.dump(self.dataset_parameters, json_file, indent=2)
+
 
 if __name__ == "__main__":
     ds = Datascrapping()
     ds.get_raw_data_from_response();
     ds.create_stack_course_dict();
     ds.export_course_list();
+    ds.export_dataset_parameters();

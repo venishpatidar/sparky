@@ -4,3 +4,5 @@ subject.json
 .venv
 pyrightconfig.json
 courses/
+dataset/dataset.json
+temp.json
