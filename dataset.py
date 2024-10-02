@@ -9,74 +9,65 @@ DATASET_FILE = "dataset.json"
 class DatasetProcessor:
 
     def __init__(self) -> None:
-        self.question_templates = defaultdict(list)
+        self.question_templates = []
         self.dataset_parameters = []
         self.conversational_data = []
 
 
     def get_question_templates(self)->None:
-        self.question_templates = {
-            "course_stack": [
-                    "What is the full form of {}?",
-                    "Which program stack is referred to as {}?",
-                    "What department does the stack {} represent?",
-                    "What is the abbreviation for the {} stack?",
-                    "Can you tell me what {} stands for?",
-                    "What is the program name for stack {}?",
-                    "In which department does the {} stack belong?",
-                    "Which program category is represented by {}?",
-                    "Can you provide more information on the {} stack?",
-                    "What is the meaning of the abbreviation {}?"
-                ],
-                "course_number": [
-                    "What is the course number for {}?",
-                    "Which course is represented by the number {}?",
-                    "What is the number assigned to {}?",
-                    "Can you give me the course number for {}?",
-                    "Which course number is associated with {}?",
-                    "Which course comes with the number {}?",
-                    "Can you tell me the number of the course titled {}?",
-                    "What number identifies the course {}?",
-                    "Can you provide the course number for {}?",
-                    "What is the course code number for the class {}?"
-                ],
-                "course_name": [
-                    "What is the name of the course with code {}?",
-                    "Can you tell me the course name for {}?",
-                    "What is the title of the course under code {}?",
-                    "What is the name of the course with number {}?",
-                    "What is the course title for {}?",
-                    "Which course is identified by the code {}?",
-                    "What course does the number {} refer to?",
-                    "Can you tell me what course is numbered {}?",
-                    "What is the name of the course that has code {}?",
-                    "Which course is associated with the code {}?"
-                ],
-                "course_code": [
-                    "What is the course code for {}?",
-                    "What is the code used for enrolling in {}?",
-                    "Can you provide the registration code for {}?",
-                    "What is the identifier code for {}?",
-                    "Which code is used for registering in {}?",
-                    "Can you tell me the course code for {}?",
-                    "What is the unique code for the course {}?",
-                    "Which registration code applies to {}?",
-                    "What code do I need to register for {}?",
-                    "What is the identifier number for the course titled {}?"
-                ],
-                "faculty_name": [
-                    "Who is the instructor for {}?",
-                    "Who teaches the course {}?",
-                    "Can you tell me who the faculty is for {}?",
-                    "Who is the professor of {}?",
-                    "Which professor teaches {}?",
-                    "Can you provide the name of the instructor for {}?",
-                    "Who is responsible for teaching {}?",
-                    "Who is assigned to the course titled {}?",
-                    "Can you tell me the faculty member for course code {}?",
-                    "Who is the course instructor for {}?"
-                ]
-        }
+        self.question_templates = [
+            # Questions about course stack
+                "What is the full form of {course_stack}?",
+                "What does {course_stack} stand for?",
+                "Can you explain what {course_stack} represents in this context?",
+                "Which courses fall under the {course_stack} category?",
+                "Are there any courses in the {course_stack} stack I can take?",
+
+                # Questions about course number
+                "What is the course number for {course_name}?",
+                "Which course has the number {course_number}?",
+                "Is there a course with number {course_number} in the {course_stack} group?",
+                "Can you tell me the course number for {course_name} in {course_stack}?",
+                "What course is identified with the number {course_number}?",
+
+                # Questions about course name
+                "What is the name of the course with course number {course_number}?",
+                "Which course is named {course_name}?",
+                "Do you offer a course called {course_name} in {course_stack}?",
+                "Can you tell me the name of the course with course code {course_code}?",
+                "What is the course name for {course_code}?",
+
+                # Questions about course code
+                "What is the course code for {course_name}?",
+                "Can you give me the code for the course {course_name}?",
+                "What course has the code {course_code}?",
+                "Which course is identified by the code {course_code}?",
+                "What is the code for the course {course_name}?",
+
+                # Questions about faculty name
+                "Who is the instructor for {course_name}?",
+                "Which faculty member teaches {course_name}?",
+                "Who is responsible for teaching {course_name}?",
+                "Can you tell me who teaches the course with code {course_code}?",
+                "Who is the faculty member for the course {course_stack} {course_number}?",
+                "Is {faculty_name} teaching any course this semester?",
+                "Which courses are taught by {faculty_name}?",
+                "Do you know the instructor for {course_stack} courses?",
+                "Is {faculty_name} the professor for any {course_stack} courses?",
+
+                # General enrollment-related questions
+                "What courses are available under {course_stack}?",
+                "Are there any faculty members teaching {course_stack} courses?",
+                "What is the code for the course I need to enroll in {course_stack}?",
+                "How can I find out the faculty for {course_stack} courses?",
+                "Can you give me the course number for any {course_stack} courses?",
+                "Can I take {course_stack} courses in this semester?",
+                "Is {faculty_name} associated with {course_stack} courses this semester?",
+                "How can I find the instructor for {course_name}?",
+                "Which courses can I take under {course_stack} group?",
+                "Is there a course in {course_stack} with the name {course_name}?",
+                "Who teaches {course_stack} {course_number}?"
+        ]
 
     def get_dataset_parameters(self, folder_path=DATASET_PATH, file_name=DATASET_COMBINATION_FILE_NAME)->None:
         file_path = os.path.join(folder_path, file_name)
@@ -88,9 +79,29 @@ class DatasetProcessor:
             except Exception as e:
                 print(f"An error occurred while reading the file: {e}")
 
+    def get_faculty_name(self, courses_data):
+        if courses_data['faculty_name']:
+            if len(courses_data['faculty_name']) == 1:
+                return courses_data["faculty_name"][0]
+            else:
+                for name in courses_data["faculty_name"]:
+                    if "Staff" not in name:
+                        return name
+        else:
+            return None
+
     def generate_conversational_data(self):
-        for category, template_question in self.question_templates.items():
-            for courses_data in self.dataset_parameters:
+
+        for courses_data in self.dataset_parameters:
+            faculty_name = self.get_faculty_name(courses_data)
+            for question in self.question_templates:
+                prompt = question.format(
+                    course_stack=courses_data["course_stack"],
+                    course_number=courses_data["course_number"],
+                    course_name=courses_data["course_name"],
+                    course_code=courses_data["course_code"],
+                    faculty_name=faculty_name
+                )
                 response = {
                     "course_stack": None,
                     "course_number": None,
@@ -98,12 +109,37 @@ class DatasetProcessor:
                     "course_code": None,
                     "faculty_name": None
                 }
-                response[category] = courses_data[category]
-                for question in template_question:
-                    self.conversational_data.append({
-                        "prompt": question.format(courses_data[category]),
-                        "response": response
-                    })
+
+                if "course_stack" in question:
+                    response["course_stack"] = courses_data["course_stack"]
+                if "course_number" in question:
+                    response["course_number"] = courses_data["course_number"]
+                if "course_name" in question:
+                    response["course_name"] = courses_data["course_name"]
+                if "course_code" in question:
+                    response["course_code"] = courses_data["course_code"]
+                if "faculty_name" in question:
+                    response["faculty_name"] = faculty_name
+
+                # Add the prompt and response to the conversation data
+                self.conversational_data.append({"prompt": prompt, "response": response})
+        # print(self.conversational_data)
+
+        # for category, template_question in self.question_templates.items():
+        #     for courses_data in self.dataset_parameters:
+        #         response = {
+        #             "course_stack": None,
+        #             "course_number": None,
+        #             "course_name": None,
+        #             "course_code": None,
+        #             "faculty_name": None
+        #         }
+        #         response[category] = courses_data[category]
+        #         for question in template_question:
+        #             self.conversational_data.append({
+        #                 "prompt": question.format(courses_data[category]),
+        #                 "response": response
+        #             })
 
     def export_dataset(self, folder_path=DATASET_PATH, file_name=DATASET_FILE) -> None:
 
@@ -111,6 +147,7 @@ class DatasetProcessor:
         file_path = os.path.join(folder_path, file_name)
         with open(file_path, "w") as json_file:
             json.dump(self.conversational_data, json_file, indent=2)
+
 
 
 
