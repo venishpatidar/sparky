@@ -13,7 +13,7 @@ class Datascrapping:
     def __init__(self) -> None:
         self.major_courses_data = []
         self.major_course_dict = defaultdict(list)
-        self.dataset_parameters = []
+        self.dataset_parameters = defaultdict(set)
 
     def get_raw_data_from_response(self, folder_path=RAW_DATA_PATH)->None:
         """
@@ -29,11 +29,12 @@ class Datascrapping:
                     class_content = json.loads(content[0]) # reading the content of the file as json object
                     self.major_courses_data.extend(class_content['classes']) # pulling classes list from the object
 
-    def create_stack_course_dict(self)->None:
+    def create_stack_course_dict(self,create_dataset_parameters:bool=False)->None:
         """
         function to create a master dict
         with STACK as key and COURSES as value
         """
+        self.dataset_parameters = defaultdict(set) # Leaving it here removes the req wiggles for adding to set
         for classes in self.major_courses_data:
             course_stack = classes['CLAS']['SUBJECT'] # pulling course STACK from the dict
             # code to create a dict with STACK as key and list of dict as values where dict object will hold all relevant
@@ -64,15 +65,13 @@ class Datascrapping:
                 "end_time": classes['CLAS']['ENDTIME'], # 11:45 AM
                 "day_list": classes['DAYLIST'] # ["T Th"]
             })
-
-            self.dataset_parameters.append({
-                "course_stack": classes['CLAS']['SUBJECT'],
-                "course_number": classes["SUBJECTNUMBER"].split(" ")[1],
-                "course_name": classes['CLAS']['COURSETITLELONG'],
-                "course_code": classes['CLAS']['CLASSNBR'],
-                "faculty_name": classes['CLAS']['INSTRUCTORSLIST']
-            })
-
+            
+            if create_dataset_parameters:#Avoiding extra memory storage
+                self.dataset_parameters["course_stack"].add(classes['CLAS']['SUBJECT'])
+                self.dataset_parameters["course_number"].add(classes["SUBJECTNUMBER"].split(" ")[1])
+                self.dataset_parameters["course_name"].add(classes['CLAS']['COURSETITLELONG'])
+                self.dataset_parameters["course_code"].add(classes['CLAS']['CLASSNBR'])                
+                self.dataset_parameters["faculty_name"].update([professor for professor in (classes['CLAS']['INSTRUCTORSLIST']) if professor and professor !="Staff"] if classes['CLAS']['INSTRUCTORSLIST'] else [])
 
     def export_course_list(self,output_dir:str=OUTPUT_DIR)->None:
         """
@@ -99,16 +98,26 @@ class Datascrapping:
         function to pull all the combination of 5 key paramters:
             course_stack, course_number, course_name, course_code, faculty_name
         """
+        if not self.dataset_parameters:
+            print(f"[x] Error while exporting dataset_parameters: Dataset parameter array is empty, try passing true to create_stack_course_dict(create_dataset_parameters=True);")
+            return
         os.makedirs(dataset_dir, exist_ok=True)
-        file_name = "dataset_combination.json"
+        file_name = "dataset_componenets.json"
         file_path = os.path.join(dataset_dir, file_name)
+        self.dataset_parameters = defaultdict(list,self.dataset_parameters) # Redefine the defaultdict to hold list
+        self.dataset_parameters["course_stack"]= list(self.dataset_parameters["course_stack"])
+        self.dataset_parameters["course_number"]= list(self.dataset_parameters["course_number"])
+        self.dataset_parameters["course_name"]= list(self.dataset_parameters["course_name"])
+        self.dataset_parameters["course_code"]= list(self.dataset_parameters["course_code"])
+        self.dataset_parameters["faculty_name"]= list(self.dataset_parameters["faculty_name"])
+
         with open(file_path, "w") as json_file:
             json.dump(self.dataset_parameters, json_file, indent=2)
-
+        print(f"All dataset componenets exported sucessfully")
 
 if __name__ == "__main__":
     ds = Datascrapping()
     ds.get_raw_data_from_response();
-    ds.create_stack_course_dict();
+    ds.create_stack_course_dict(True);
     ds.export_course_list();
     ds.export_dataset_parameters();

@@ -6,3 +6,4 @@ pyrightconfig.json
 courses/
 dataset/dataset.json
 temp.json
+dataset/*.json
