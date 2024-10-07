@@ -1,10 +1,16 @@
 import json
 import os
 from collections import defaultdict
+from dotenv import find_dotenv, load_dotenv
+import psycopg2
 
 RAW_DATA_PATH = "raw_data/classes"
 OUTPUT_DIR = "courses"
 DATASET_DIR = "dataset"
+POSTGRES_HOST = "localhost"
+POSTGRES_DATABASE = "asu_class_db"
+POSTGRES_PORT = "5432"
+
 
 class Datascrapping:
     """
@@ -14,6 +20,17 @@ class Datascrapping:
         self.major_courses_data = []
         self.major_course_dict = defaultdict(list)
         self.dataset_parameters = defaultdict(set)
+        load_dotenv(find_dotenv())
+        self.connection = None
+        self.cursor = None
+        self.db_params = {
+            "host": POSTGRES_HOST,
+            "database": POSTGRES_DATABASE,
+            "user": os.environ["POSTGRES_USER"],
+            "password": os.environ["POSTGRES_PASS"],
+            "port": POSTGRES_PORT
+        }
+
 
     def get_raw_data_from_response(self, folder_path=RAW_DATA_PATH)->None:
         """
@@ -65,12 +82,12 @@ class Datascrapping:
                 "end_time": classes['CLAS']['ENDTIME'], # 11:45 AM
                 "day_list": classes['DAYLIST'] # ["T Th"]
             })
-            
+
             if create_dataset_parameters:#Avoiding extra memory storage
                 self.dataset_parameters["course_stack"].add(classes['CLAS']['SUBJECT'])
                 self.dataset_parameters["course_number"].add(classes["SUBJECTNUMBER"].split(" ")[1])
                 self.dataset_parameters["course_name"].add(classes['CLAS']['COURSETITLELONG'])
-                self.dataset_parameters["course_code"].add(classes['CLAS']['CLASSNBR'])                
+                self.dataset_parameters["course_code"].add(classes['CLAS']['CLASSNBR'])
                 self.dataset_parameters["faculty_name"].update([professor for professor in (classes['CLAS']['INSTRUCTORSLIST']) if professor and professor !="Staff"] if classes['CLAS']['INSTRUCTORSLIST'] else [])
 
     def export_course_list(self,output_dir:str=OUTPUT_DIR)->None:
@@ -115,9 +132,90 @@ class Datascrapping:
             json.dump(self.dataset_parameters, json_file, indent=2)
         print(f"All dataset componenets exported sucessfully")
 
+    def get_postgres_conn(self) -> None:
+        try:
+            self.connection = psycopg2.connect(**self.db_params)
+            self.cursor = self.connection.cursor()
+        except Exception as e:
+            print(f"Error while getting postgres connection : {e}")
+
+    def insert_class_data_to_postgres(self)->None:
+        insert_query = '''
+        INSERT INTO asu_classes(
+        course_prefix,
+        course_stack,
+        course_stack_full_form,
+        course_name,
+        course_code,
+        session, term,
+        faculty,
+        college,
+        department,
+        seat_info_enrl_cap,
+        seat_info_enrl_tot,
+        address,
+        map_url,
+        campus,
+        campus_descr,
+        acad_career,
+        hours,
+        start_date,
+        start_time,
+        end_date,
+        end_time,
+        day_list
+        )
+        VALUES (
+        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+        )
+        '''
+
+        try:
+            with self.cursor as cursor:
+                for classes in self.major_courses_data:
+                    try:
+                        cursor.execute(insert_query, (
+                            classes["SUBJECTNUMBER"], # AMT 490 - course prefix
+                            classes["CLAS"]["SUBJECT"], # AMT - course stack
+                            classes["CLAS"]["SUBJECTDESCRIPTION"], # Aeronautical Management Technology
+                            classes['CLAS']['COURSETITLELONG'], # Regional Jet Operations Capstone
+                            classes['CLAS']['CLASSNBR'], # 11449
+                            classes['CLAS']['SESSIONCODE'], # A/B/C
+                            classes['CLAS']['STRM'], # 2251 - first digit -> millenia. 2nd and 3rd digit -> last two digit of year
+                                                            # last digit -> semester Spring (1), Summer (4), Fall (7)
+                            ((",").join(faculty_name for faculty_name in classes['CLAS']['INSTRUCTORSLIST']) if classes['CLAS']['INSTRUCTORSLIST'] is not None and len(classes['CLAS']['INSTRUCTORSLIST']) != 0 else None), # List of all the faculties -> ["Anthony Wende"]
+                            classes['OFFEREDBY']['INFO']['DESCRFORMAL'], # Ira A. Fulton Schools of Engineering
+                            classes['OFFEREDBY']['DEPARTMENT'], # Aviation Programs
+                            classes['seatInfo']["ENRL_CAP"],
+                            classes['seatInfo']["ENRL_TOT"], # this is a dictionary with ENRL_CAP and ENRL_TOT -> "seatInfo": { "ENRL_CAP": 28, "ENRL_TOT": 0 }
+                            classes['LOCATIONBUILDING'][0]["ADDRESS"],
+                            classes['LOCATIONBUILDING'][0]["URL"],
+                            # {"address" : "Simulator Building 157 (Poly)", "map_url" : "http://www.asu.edu/map/interactive/?psCode=SIM"}
+                            # "location_descr": classes['CLAS']['DESCR'], # ASU at Polytechnic
+                            classes['CLAS']['CAMPUS'], # POLY
+                            classes['CLAS']['DESCR'], # ASU at Polytechnic
+                            classes['CLAS']['ACADCAREER'], # UGRD
+                            classes['HOURS'], # 3
+                            classes['CLAS']['STARTDATE'], # 2025-01-13 00:00:00.0
+                            classes['CLAS']['STARTTIME'], # 10:30 AM
+                            classes['CLAS']['ENDDATE'], # 2025-05-02 00:00:00.0
+                            classes['CLAS']['ENDTIME'], # 11:45 AM
+                            (",").join(days for days in classes['DAYLIST']) # ["T Th"]
+                            )
+                        )
+                    except Exception as e:
+                        print(f'Error records: {e} ----- classes {classes}')
+                        break
+
+                self.connection.commit()
+        except Exception as e:
+            print(f'Error inserting records: {e}')
+
 if __name__ == "__main__":
     ds = Datascrapping()
     ds.get_raw_data_from_response();
     ds.create_stack_course_dict(True);
-    ds.export_course_list();
-    ds.export_dataset_parameters();
+    # ds.export_course_list();
+    # ds.export_dataset_parameters();
+    ds.get_postgres_conn();
+    ds.insert_class_data_to_postgres()
