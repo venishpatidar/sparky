@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS asu_classes (
     course_code VARCHAR(255) UNIQUE,
     session VARCHAR(255),
     term VARCHAR(255),
-    faculty VARCHAR(255),
+    faculty VARCHAR(10000),
     college VARCHAR(255),
     department VARCHAR(255),
     seat_info_enrl_cap INT,

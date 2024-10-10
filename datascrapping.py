@@ -7,6 +7,8 @@ import psycopg2
 RAW_DATA_PATH = "raw_data/classes"
 OUTPUT_DIR = "courses"
 DATASET_DIR = "dataset"
+
+# database parameters
 POSTGRES_HOST = "localhost"
 POSTGRES_DATABASE = "asu_class_db"
 POSTGRES_PORT = "5432"
@@ -30,7 +32,6 @@ class Datascrapping:
             "password": os.environ["POSTGRES_PASS"],
             "port": POSTGRES_PORT
         }
-
 
     def get_raw_data_from_response(self, folder_path=RAW_DATA_PATH)->None:
         """
@@ -132,7 +133,99 @@ class Datascrapping:
             json.dump(self.dataset_parameters, json_file, indent=2)
         print(f"All dataset componenets exported sucessfully")
 
+    def create_database(self):
+        """
+        function to create database in postgres
+        with host - localhost
+        database - asu_class_db
+        port - 5432
+        """
+        try:
+            conn_params = self.db_params.copy()
+            if 'database' in conn_params:
+                del conn_params['database']
+            conn = psycopg2.connect(**conn_params)
+            conn.autocommit = True
+            with conn.cursor() as cursor:
+                conn_params = self.db_params.copy()
+                conn_params["database"] = POSTGRES_DATABASE
+
+                # Check if the database already exists
+                cursor.execute(
+                    f"SELECT 1 FROM pg_database WHERE datname = '{conn_params['database']}'"
+                )
+                exists = cursor.fetchone()
+                if not exists:
+                    # Create the database if it doesn't exist
+                    cursor.execute(f"CREATE DATABASE {conn_params['database']}")
+                    print(f"Database '{conn_params['database']}' created successfully.")
+                else:
+                    print(f"Database '{conn_params['database']}' already exists.")
+
+            conn.close()
+
+            # Now connect to the new or existing database to create the table
+            self.create_asu_classes_table()
+
+        except Exception as e:
+            print(f"Error creating database: {e}")
+
+    def create_asu_classes_table(self):
+        """
+        function to create asu_classes table if not exist
+        with relevant attributes
+        """
+        try:
+
+            # Connect to the specific database to create the table
+            self.connection = psycopg2.connect(**self.db_params)
+            self.connection.autocommit = True
+            self.cursor = self.connection.cursor()
+
+            # Define the SQL query to create the table
+            create_table_query = """
+            CREATE TABLE IF NOT EXISTS asu_classes (
+                id SERIAL PRIMARY KEY,
+                course_prefix VARCHAR(255),
+                course_stack VARCHAR(255),
+                course_stack_full_form VARCHAR(255),
+                course_name VARCHAR(255),
+                course_code VARCHAR(255) UNIQUE,
+                session VARCHAR(255),
+                term VARCHAR(255),
+                faculty VARCHAR(10000),
+                college VARCHAR(255),
+                department VARCHAR(255),
+                seat_info_enrl_cap INT,
+                seat_info_enrl_tot INT,
+                address VARCHAR(255),
+                map_url VARCHAR(255),
+                campus VARCHAR(255),
+                campus_descr VARCHAR(255),
+                acad_career VARCHAR(255),
+                hours VARCHAR(255),
+                start_date TIMESTAMP,
+                start_time VARCHAR(255),
+                end_date TIMESTAMP,
+                end_time VARCHAR(255),
+                day_list VARCHAR(255)
+            );
+            """
+
+            # Execute the table creation query
+            self.cursor.execute(create_table_query)
+            print("Table 'asu_classes' created successfully.")
+            self.cursor.close()
+            self.connection.close()
+
+        except Exception as e:
+            print(f"Error creating table: {e}")
+
     def get_postgres_conn(self) -> None:
+        """
+        function to get connection to postgres
+        this will assist in running queries against the database
+        """
         try:
             self.connection = psycopg2.connect(**self.db_params)
             self.cursor = self.connection.cursor()
@@ -140,6 +233,11 @@ class Datascrapping:
             print(f"Error while getting postgres connection : {e}")
 
     def insert_class_data_to_postgres(self)->None:
+        """
+        funciton to insert data into the database and 
+        table created above
+        """
+
         insert_query = '''
         INSERT INTO asu_classes(
         course_prefix,
@@ -213,9 +311,18 @@ class Datascrapping:
 
 if __name__ == "__main__":
     ds = Datascrapping()
-    ds.get_raw_data_from_response();
-    ds.create_stack_course_dict(True);
+    ds.get_raw_data_from_response()
+    ds.create_stack_course_dict(True)
     # ds.export_course_list();
     # ds.export_dataset_parameters();
-    ds.get_postgres_conn();
+    
+    """
+    ds.create_database() - run this if database is not created
+    ds.create_asu_classes_table() - run this if table is not created
+
+    for the first time run ds.create_database() - it will call ds.create_asu_classes_table
+    """
+    ds.create_database()
+    # ds.create_asu_classes_table()
+    ds.get_postgres_conn()
     ds.insert_class_data_to_postgres()
