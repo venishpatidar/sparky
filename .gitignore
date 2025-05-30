@@ -1,1 +1,11 @@
-*.temp
+*temp
+raw_data/
+subject.json
+.venv
+pyrightconfig.json
+courses/
+dataset/dataset.json
+temp.json
+dataset/*.json
+*__pycache__
+dataset_conn_test.py
