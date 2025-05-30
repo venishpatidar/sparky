@@ -12,12 +12,12 @@ class SparkyNPL2JSON:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.tokenizer = T5Tokenizer.from_pretrained(
-            model_path or config.MOEDL_PATH
+            model_path or config.MODEL_PATH
         )
         self.model = T5ForConditionalGeneration.from_pretrained(
-            config.MOEDL_PATH or config.MOEDL_PATH
+            model_path or config.MODEL_PATH
         )
-        self.model.to(self.device)
+        self.model.to(self.device) # type: ignore
 
     def _tokenize(self,input):
         return self.tokenizer(
@@ -49,9 +49,3 @@ class SparkyNPL2JSON:
             white space and can breakdown at somepoint  
         """
         return {key: (None if value == 'null' else value) for t in text.replace(": ", ":").split(", ") for key, value in [t.split(":")]}
-
-
-if __name__=="__main__":
-    model = SparkyNPL2JSON()
-    text="What is the course code for Sustainable Civil and Environmental Systems Engineering?"
-    print(model.generate(text))
