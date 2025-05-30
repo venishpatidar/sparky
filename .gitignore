@@ -10,3 +10,4 @@ dataset/*.json
 *__pycache__
 dataset_conn_test.py
 .*
+model/T5-fine-tuned-NLP-JSON
