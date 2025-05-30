@@ -9,3 +9,4 @@ temp.json
 dataset/*.json
 *__pycache__
 dataset_conn_test.py
+.*
